@@ -15,22 +15,28 @@ tm.main(function() {
         .resize(500, 500);
     if (STATS) bfs.core.enableStats();
 
-    bfs.core.keyboard = tm.input.Keyboard(window);
     bfs.core.fitWindow();
+    var assets = {
+        "title": "title.png",
+        "ship0": "ship0.png",
+        "ship1": "ship1.png",
+        "bullet": "bullet.png",
+        "background": "background.png",
+        "explosion": "explosion.png",
+        "splash": "splash.png",
+        "soundExplosion": "se_maoudamashii_explosion05.mp3",
+        "soundSplash": "sen_ge_bom13.mp3",
+        "soundFire": "sen_ge_taihou03.mp3",
+        "soundChange": "se_maoudamashii_system36.mp3",
+    };
+    if (tm.BROWSER === "Firefox") {
+        delete assets["soundExplosion"];
+        delete assets["soundSplash"];
+        delete assets["soundFire"];
+        delete assets["soundChange"];
+    }
     bfs.core.replaceScene(tm.app.LoadingScene({
-        assets: {
-            "title": "title.png",
-            "ship0": "ship0.png",
-            "ship1": "ship1.png",
-            "bullet": "bullet.png",
-            "background": "background.png",
-            "explosion": "explosion.png",
-            "splash": "splash.png",
-            "soundExplosion": "se_maoudamashii_explosion05.mp3",
-            "soundSplash": "sen_ge_bom13.mp3",
-            "soundFire": "sen_ge_taihou03.mp3",
-            "soundChange": "se_maoudamashii_system36.mp3",
-        },
+        assets: assets,
         nextScene: function() {
             ["ship1"].forEach(function(name) {
 
@@ -90,16 +96,21 @@ tm.define("bfs.TitleScene", {
 tm.define("bfs.GameOverScene", {
     superClass: tm.app.Scene,
 
+    score: 0,
+
     init: function() {
         this.superInit();
 
+        this.score = bfs.score;
+
         label("轟沈", 40, 250, 150, this).setFillStyle("red");
+        label("得点: " + this.score, 40, 250, 250, this);
         label("スペースキーを押してください", 20, 250, 350, this).setFillStyle("red");
     },
 
     update: function(app) {
         if (app.keyboard.getKeyDown("space")) {
-            app.replaceScene(bfs.TitleScene());
+            tm.social.Nineleap.postRanking(this.score, "得点 " + this.score);
         }
     },
 
@@ -130,7 +141,8 @@ tm.define("bfs.GameClearScene", {
 
 var playSound = function(soundName, frame) {
     if (playSound.played[soundName] !== frame) {
-        tm.asset.AssetManager.get(soundName).clone().play();
+        var s = tm.asset.AssetManager.get(soundName);
+        if (s) s.clone().play();
         playSound.played[soundName] = frame;
     }
 };
@@ -156,7 +168,7 @@ tm.define("bfs.MainScene", {
 
         for (var i = 0; i < 10; i++) {
             var d = Math.random() * Math.PI * 2;
-            var l = Math.rand(2000, 7000);
+            var l = Math.rand(1500, 5000);
             var e = bfs.AIShip(0.4)
                 .setPosition(Math.cos(d)*l, Math.sin(d)*l)
                 .setRotation(Math.rand(0, 360));
@@ -169,6 +181,8 @@ tm.define("bfs.MainScene", {
 
         this.label = label("敵艦 残り " + bfs.enemies.length + "隻", 20, 250, 50, this);
         this.label2 = label("耐久力 残り " + bfs.myShip.hp, 20, 250, 450, this);
+
+        bfs.Lader().setPosition(500-80, 80).addChildTo(this);
     },
 
     update: function() {
@@ -347,10 +361,10 @@ tm.define("bfs.Ship", {
 tm.define("bfs.AIShip", {
     superClass: bfs.Ship,
 
-    maxVelocity: 0.8,
-    accel: 0.02,
-    turnSpeed: 0.12,
-    bulletLimit: 30,
+    maxVelocity: 1.3,
+    accel: 0.03,
+    turnSpeed: 0.20,
+    bulletLimit: 32,
 
     init: function(scale) {
         this.superInit(scale);
@@ -423,8 +437,8 @@ tm.define("bfs.MyShip", {
     superClass: bfs.Ship,
 
     maxHp: 20,
-    maxVelocity: 1.0,
-    accel: 0.02,
+    maxVelocity: 1.5,
+    accel: 0.03,
     turnSpeed: 0.24,
     bulletLimit: 40,
 
@@ -460,7 +474,8 @@ tm.define("bfs.MyShip", {
         this.markers = [];
         for (var i = 0; i < 100; i++) {
             this.markers.push(tm.display.TriangleShape(20, 20, {
-                fillStyle: "red"
+                strokeStyle: "transparent",
+                fillStyle: "red",
             }));
         }
     },
@@ -524,7 +539,7 @@ tm.define("bfs.MyShip", {
             this.markers[i]
                 .setPosition(this.x + Math.cos(d)*100, this.y + Math.sin(d)*100)
                 .setRotation(d*Math.RAD_TO_DEG+90)
-                .setScale(Math.max(0.2, (2000-l)/2000))
+                .setScale(Math.max(0.4, (2000-l)/1500))
                 .addChildTo(bfs.sea.topLayer);
         }
         for (var j = i; j < this.markers.length; j++) {
@@ -570,7 +585,7 @@ tm.define("bfs.Bullet", {
                     bfs.Explode(this.x, this.y).setRotation(Math.rand(0, 360)).addChildTo(bfs.sea.topLayer);
                     playSound("soundExplosion", app.frame);
                     enemy.damage();
-                    this.remove();
+                    if (this.parent) this.remove();
                 }
             }.bind(this));
         } else if (bfs.myShip.parent) {
@@ -578,7 +593,7 @@ tm.define("bfs.Bullet", {
                 bfs.Explode(this.x, this.y).setRotation(Math.rand(0, 360)).addChildTo(bfs.sea.topLayer);
                 playSound("soundExplosion", app.frame);
                 bfs.myShip.damage();
-                this.remove();
+                if (this.parent) this.remove();
             }
         }
 
@@ -680,6 +695,28 @@ tm.define("bfs.Splash", {
 
     update: function() {
         if (this.currentFrameIndex === 32) this.remove();
+    },
+
+});
+
+tm.define("bfs.Lader", {
+    superClass: tm.display.CanvasElement,
+
+    init: function() {
+        this.superInit();
+    },
+
+    draw: function(canvas) {
+        canvas.fillStyle = "rgba(0, 0, 0, 0.5)";
+        canvas.fillRect(-75, -75, 150, 150);
+        canvas.fillStyle = "blue";
+        canvas.fillRect(-1, -1, 2, 2);
+        canvas.fillStyle = "red";
+        bfs.enemies.forEach(function(enemy) {
+            var x = (enemy.x - bfs.myShip.x) / 100;
+            var y = (enemy.y - bfs.myShip.y) / 100;
+            canvas.fillRect(x-1, y-1, 2, 2);
+        });
     },
 
 });
