@@ -3,7 +3,7 @@ var bfs = {
     core: null,
     sea: null,
     myShip: null,
-    enemies: [],
+    enemies: null,
     score: 0,
 };
 
@@ -66,7 +66,9 @@ var label = function(text, size, x, y, addTarget) {
     var l = tm.display.Label(text, size)
         .setAlign("center")
         .setBaseline("middle")
-        .setPosition(x, y);
+        .setPosition(x, y)
+        .setShadowColor("#FFF957")
+        .setShadowBlur(100);
     l.addChildTo(addTarget);
     return l;
 };
@@ -80,8 +82,8 @@ tm.define("bfs.TitleScene", {
         tm.display.Sprite("title", 500, 500)
             .setPosition(250, 250)
             .addChildTo(this);
-        label("大海戦！", 60, 250, 70, this).setFillStyle("red");
-        label("ヤマトさん", 90, 250, 150, this).setFillStyle("yellow");
+        label("大海戦！", 60, 250, 70, this).setFillStyle("#F2CF30");
+        label("ヤマトさん", 90, 250, 150, this).setFillStyle("#ED7D0C");
         label("スペースキーを押してください", 20, 250, 350, this);
     },
 
@@ -103,9 +105,9 @@ tm.define("bfs.GameOverScene", {
 
         this.score = bfs.score;
 
-        label("轟沈", 40, 250, 150, this).setFillStyle("red");
+        label("轟沈", 40, 250, 150, this).setFillStyle("#F25A30");
         label("得点: " + this.score, 40, 250, 250, this);
-        label("スペースキーを押してください", 20, 250, 350, this).setFillStyle("red");
+        label("スペースキーを押してください", 20, 250, 350, this).setFillStyle("#F25A30");
     },
 
     update: function(app) {
@@ -139,11 +141,11 @@ tm.define("bfs.GameClearScene", {
 
 });
 
-var playSound = function(soundName, frame) {
-    if (playSound.played[soundName] !== frame) {
+var playSound = function(soundName) {
+    if (playSound.played[soundName] !== bfs.core.frame) {
         var s = tm.asset.AssetManager.get(soundName);
         if (s) s.clone().play();
-        playSound.played[soundName] = frame;
+        playSound.played[soundName] = bfs.core.frame;
     }
 };
 playSound.played = {};
@@ -166,6 +168,7 @@ tm.define("bfs.MainScene", {
         bfs.myShip = this.myShip = bfs.MyShip();
         this.myShip.addChildTo(this.sea.topLayer);
 
+        bfs.enemies = [];
         for (var i = 0; i < 10; i++) {
             var d = Math.random() * Math.PI * 2;
             var l = Math.rand(1500, 5000);
@@ -251,7 +254,7 @@ tm.define("bfs.Ship", {
     turn: 0,
 
     init: function(scale) {
-        this.superInit("ship0", 300, 300);
+        this.superInit("ship0");
         this.setScale(scale);
 
         this.hp = this.maxHp;
@@ -286,9 +289,38 @@ tm.define("bfs.Ship", {
         if (this.hp <= 0) {
             bfs.Explode(this.x, this.y).addChildTo(bfs.sea.topLayer);
             playSound("soundExplosion");
-            if (this.parent) this.remove();
-            if (this !== bfs.myShip) bfs.enemies.erase(this);
             this.onDestroy();
+
+            this.tweener.clear()
+                .wait(Math.rand(200, 600))
+                .call(function() {
+                    bfs.Explode(this.x, this.y).addChildTo(bfs.sea.topLayer);
+                    playSound("soundExplosion");
+                }.bind(this))
+                .wait(Math.rand(200, 600))
+                .call(function() {
+                    bfs.Explode(this.x, this.y).addChildTo(bfs.sea.topLayer);
+                    playSound("soundExplosion");
+                }.bind(this))
+                .wait(Math.rand(200, 600))
+                .call(function() {
+                    bfs.Explode(this.x, this.y).addChildTo(bfs.sea.topLayer);
+                    playSound("soundExplosion");
+                }.bind(this))
+                .wait(Math.rand(200, 600))
+                .call(function() {
+                    bfs.Explode(this.x, this.y, 3).addChildTo(bfs.sea.topLayer);
+                    bfs.SplashL(this.x+Math.rand(5, 30), this.y+Math.rand(5, 30)).addChildTo(bfs.sea.topLayer);
+                    bfs.Hamon(this.x+Math.rand(5, 30), this.y+Math.rand(5, 30), 1).addChildTo(bfs.sea.bottomLayer);
+                    bfs.SplashL(this.x+Math.rand(5, 30), this.y+Math.rand(5, 30)).addChildTo(bfs.sea.topLayer);
+                    bfs.Hamon(this.x+Math.rand(5, 30), this.y+Math.rand(5, 30), 1).addChildTo(bfs.sea.bottomLayer);
+                    bfs.SplashL(this.x+Math.rand(5, 30), this.y+Math.rand(5, 30)).addChildTo(bfs.sea.topLayer);
+                    bfs.Hamon(this.x+Math.rand(5, 30), this.y+Math.rand(5, 30), 1).addChildTo(bfs.sea.bottomLayer);
+                    playSound("soundExplosion");
+                    if (this.parent) this.remove();
+                    if (this !== bfs.myShip) bfs.enemies.erase(this);
+                }.bind(this));
+
         }
     },
 
@@ -317,8 +349,8 @@ tm.define("bfs.Ship", {
             cannon.heat -= 1;
         });
 
-        if (app.frame % 10 === 0 && Math.abs(this.velocity) > 0.1) {
-            bfs.Hamon(this.x, this.y, 0.6).addChildTo(bfs.sea.bottomLayer);
+        if (app.frame % 3 === 0 && Math.abs(this.velocity) > 0.1) {
+            bfs.Hamon(this.x, this.y, 0.5).addChildTo(bfs.sea.bottomLayer);
         }
     },
 
@@ -328,29 +360,37 @@ tm.define("bfs.Ship", {
 
     fireCannon: function(cannon, frame) {
         if (cannon.heat <= 0) {
+            var mv = tm.geom.Vector2().setDegree(this.rotation, this.velocity);
+
             var p0 = this.parent.globalToLocal(cannon.localToGlobal({ x: 200, y: -60 }));
-            bfs.Bullet(this.bulletLimit, this === bfs.myShip)
+            var b0 = bfs.Bullet(this.bulletLimit, this === bfs.myShip)
                 .setPosition(p0.x, p0.y)
-                .setRotation(this.rotation + cannon.rotation)
-                .addChildTo(bfs.sea.topLayer);
+                .setRotation(this.rotation + cannon.rotation);
+            var v0 = tm.geom.Vector2().setDegree(b0.rotation, 1);
+            b0.velocity += tm.geom.Vector2.dot(mv, v0);
+            b0.addChildTo(bfs.sea.topLayer);
             
             var p1 = this.parent.globalToLocal(cannon.localToGlobal({ x: 250, y: 0 }));
-            bfs.Bullet(this.bulletLimit, this === bfs.myShip)
+            var b1 = bfs.Bullet(this.bulletLimit, this === bfs.myShip)
                 .setPosition(p1.x, p1.y)
-                .setRotation(this.rotation + cannon.rotation)
-                .addChildTo(bfs.sea.topLayer);
+                .setRotation(this.rotation + cannon.rotation);
+            var v1 = tm.geom.Vector2().setDegree(b1.rotation, 1);
+            b1.velocity += tm.geom.Vector2.dot(mv, v1);
+            b1.addChildTo(bfs.sea.topLayer);
             
             var p2 = this.parent.globalToLocal(cannon.localToGlobal({ x: 200, y: 60 }));
-            bfs.Bullet(this.bulletLimit, this === bfs.myShip)
+            var b2 = bfs.Bullet(this.bulletLimit, this === bfs.myShip)
                 .setPosition(p2.x, p2.y)
-                .setRotation(this.rotation + cannon.rotation)
-                .addChildTo(bfs.sea.topLayer);
+                .setRotation(this.rotation + cannon.rotation);
+            var v2 = tm.geom.Vector2().setDegree(b1.rotation, 1);
+            b2.velocity += tm.geom.Vector2.dot(mv, v2);
+            b2.addChildTo(bfs.sea.topLayer);
 
             bfs.Explode(p1.x, p1.y).setScale(0.5).setRotation(Math.rand(0, 360)).addChildTo(bfs.sea.topLayer);
 
             bfs.Hamon(p1.x, p1.y, 1).addChildTo(bfs.sea.bottomLayer);
 
-            playSound("soundFire", frame);
+            playSound("soundFire");
 
             cannon.heat = 60;
         }
@@ -365,6 +405,7 @@ tm.define("bfs.AIShip", {
     accel: 0.03,
     turnSpeed: 0.20,
     bulletLimit: 32,
+    turnFlag: false,
 
     init: function(scale) {
         this.superInit(scale);
@@ -375,44 +416,55 @@ tm.define("bfs.AIShip", {
         while(dir <= -180) dir += 360;
         while(180 < dir) dir -= 360;
 
-        if (-120 < dir && dir < 120) {
-            this.ahead = 1;
-            if (dir < 10) {
-                this.turn = -1;
-            } else if (-10 < dir) {
-                this.turn = 1
-            } else {
-                this.turn = 0;
+        var dist = Math.sqrt((bfs.myShip.x - this.x)*(bfs.myShip.x - this.x) + (bfs.myShip.y - this.y)*(bfs.myShip.y - this.y));
+
+        if (dist < 500) {
+            if (!this.turnFlag) {
+                this.turn = Math.random() < 0.5 ? -1 : 1;
+                this.turnFlag = true;
             }
         } else {
-            this.ahead = -1;
-            if (dir < 10) {
-                this.turn = -1;
-            } else if (-10 < dir) {
-                this.turn = 1
+            this.turnFlag = false;
+            if (-150 < dir && dir < 150) {
+                this.ahead = 1;
+                if (dir < 10) {
+                    this.turn = -1;
+                } else if (-10 < dir) {
+                    this.turn = 1
+                } else {
+                    this.turn = 0;
+                }
             } else {
-                this.turn = 0;
+                this.ahead = -1;
+                if (dir < 10) {
+                    this.turn = -1;
+                } else if (-10 < dir) {
+                    this.turn = 1
+                } else {
+                    this.turn = 0;
+                }
             }
         }
 
-        if (dir < this.cannons[0].rotation) {
-            this.rotateCannon(this.cannons[0], -0.5);
-        } else if (this.cannons[0].rotation < dir) {
-            this.rotateCannon(this.cannons[0], 0.5);
-        }
-        if (dir < this.cannons[1].rotation) {
-            this.rotateCannon(this.cannons[1], -0.5);
-        } else if (this.cannons[1].rotation < dir) {
-            this.rotateCannon(this.cannons[1], 0.5);
-        }
-        if (dir < this.cannons[2].rotation) {
-            this.rotateCannon(this.cannons[2], 0.5);
-        } else if (this.cannons[2].rotation < dir) {
-            this.rotateCannon(this.cannons[2], -0.5);
+        if (dist < 1000) {
+            if (dir < this.cannons[0].rotation) {
+                this.rotateCannon(this.cannons[0], -0.5);
+            } else if (this.cannons[0].rotation < dir) {
+                this.rotateCannon(this.cannons[0], 0.5);
+            }
+            if (dir < this.cannons[1].rotation) {
+                this.rotateCannon(this.cannons[1], -0.5);
+            } else if (this.cannons[1].rotation < dir) {
+                this.rotateCannon(this.cannons[1], 0.5);
+            }
+            if (dir < this.cannons[2].rotation) {
+                this.rotateCannon(this.cannons[2], 0.5);
+            } else if (this.cannons[2].rotation < dir) {
+                this.rotateCannon(this.cannons[2], -0.5);
+            }
         }
 
-        var distance = tm.geom.Vector2(this.x - bfs.myShip.x, this.y - bfs.myShip.y).length();
-        if (distance < 800 && Math.random() < 0.02) {
+        if (dist < 700 && Math.random() < 0.02) {
             this.fireCannon(this.cannons.random(), app.frame);
         }
 
@@ -502,10 +554,10 @@ tm.define("bfs.MyShip", {
 
         if (app.keyboard.getKeyDown("w")) {
             this.selectedCannon = (this.selectedCannon - 1 + this.cannons.length) % this.cannons.length;
-            playSound("soundChange", app.frame);
+            playSound("soundChange");
         } else if (app.keyboard.getKeyDown("s")) {
             this.selectedCannon = (this.selectedCannon + 1 + this.cannons.length) % this.cannons.length;
-            playSound("soundChange", app.frame);
+            playSound("soundChange");
         }
 
         if (app.keyboard.getKey("d")) {
@@ -523,14 +575,25 @@ tm.define("bfs.MyShip", {
         }
 
         // 敵艦との衝突
-        bfs.enemies.forEach(function(enemy) {
-            if (tm.geom.Vector2(this.x-enemy.x, this.y-enemy.y).length() < 20) {
-                bfs.Explode(this.x, this.y).setRotation(Math.rand(0, 360)).addChildTo(bfs.sea.topLayer);
-                playSound("soundExplosion", app.frame);
-                this.damage();
-                enemy.damage();
-            }
-        }.bind(this));
+        if (this.hp > 0) {
+            bfs.enemies.forEach(function(enemy) {
+                if (bfs.isHitElement(this, enemy)) {
+                    playSound("soundExplosion");
+                    this.damage();
+                    enemy.damage();
+
+                    var v = tm.geom.Vector2(enemy.x - this.x, enemy.y - this.y).normalize();
+                    var mv = tm.geom.Vector2().setDegree(this.rotation, this.velocity).normalize();
+                    var ev = tm.geom.Vector2().setDegree(enemy.rotation, enemy.velocity).normalize();
+                    if (tm.geom.Vector2.dot(v, mv) > 0.5) {
+                        this.velocity *= -1;
+                    }
+                    if (tm.geom.Vector2.dot(v, ev) < -0.5) {
+                        enemy.velocity *= -1;
+                    }
+                }
+            }.bind(this));
+        }
 
         for (var i = 0; i < bfs.enemies.length; i++) {
             var e = bfs.enemies[i];
@@ -569,7 +632,7 @@ tm.define("bfs.Bullet", {
     isMine: false,
 
     init: function(limit, isMine) {
-        this.superInit("bullet", 30, 30);
+        this.superInit("bullet");
         this.limit = limit;
         this.isMine = isMine;
     },
@@ -581,17 +644,19 @@ tm.define("bfs.Bullet", {
 
         if (this.isMine) {
             bfs.enemies.forEach(function(enemy) {
-                if (tm.geom.Vector2(this.x-enemy.x, this.y-enemy.y).length() < 20) {
-                    bfs.Explode(this.x, this.y).setRotation(Math.rand(0, 360)).addChildTo(bfs.sea.topLayer);
-                    playSound("soundExplosion", app.frame);
-                    enemy.damage();
-                    if (this.parent) this.remove();
+                if (enemy.hp > 0) {
+                    if (tm.geom.Vector2(this.x-enemy.x, this.y-enemy.y).length() < 20) {
+                        bfs.Explode(this.x, this.y).setRotation(Math.rand(0, 360)).addChildTo(bfs.sea.topLayer);
+                        playSound("soundExplosion");
+                        enemy.damage();
+                        if (this.parent) this.remove();
+                    }
                 }
             }.bind(this));
-        } else if (bfs.myShip.parent) {
+        } else if (bfs.myShip.hp > 0) {
             if (tm.geom.Vector2(this.x-bfs.myShip.x, this.y-bfs.myShip.y).length() < 20) {
                 bfs.Explode(this.x, this.y).setRotation(Math.rand(0, 360)).addChildTo(bfs.sea.topLayer);
-                playSound("soundExplosion", app.frame);
+                playSound("soundExplosion");
                 bfs.myShip.damage();
                 if (this.parent) this.remove();
             }
@@ -601,7 +666,7 @@ tm.define("bfs.Bullet", {
         if (this.age > this.limit) {
             bfs.Splash(this.x, this.y).addChildTo(bfs.sea.topLayer);
             bfs.Hamon(this.x, this.y, 1.0).addChildTo(bfs.sea.bottomLayer);
-            playSound("soundSplash", app.frame);
+            playSound("soundSplash");
             if (this.parent) this.remove();
         }
     },
@@ -611,7 +676,8 @@ tm.define("bfs.Bullet", {
 tm.define("bfs.Explode", {
     superClass: tm.display.AnimationSprite,
 
-    init: function(x, y) {
+    init: function(x, y, scale) {
+        if (!scale) scale = 1;
         this.superInit(tm.asset.SpriteSheet({
             image: "explosion",
             frame: {
@@ -627,7 +693,7 @@ tm.define("bfs.Explode", {
                 }
             }
         }), 100, 100);
-        this.setPosition(x, y);
+        this.setPosition(x, y).setScale(scale);
         this.gotoAndPlay("exp");
     },
 
@@ -699,6 +765,36 @@ tm.define("bfs.Splash", {
 
 });
 
+tm.define("bfs.SplashL", {
+    superClass: tm.display.AnimationSprite,
+
+    init: function(x, y) {
+        this.superInit(tm.asset.SpriteSheet({
+            image: "splash",
+            frame: {
+                width: 100,
+                height: 100,
+                count: 64
+            },
+            animations: {
+                "splash": {
+                    frames: [].range(0, 16).concat([].range(14, -1)),
+                    next: null,
+                    frequency: 2
+                }
+            }
+        }), 300, 300);
+        this.gotoAndPlay("splash");
+        this.setPosition(x, y-30);
+        this.blendMode = "lighter";
+    },
+
+    update: function() {
+        if (this.currentFrameIndex === 32) this.remove();
+    },
+
+});
+
 tm.define("bfs.Lader", {
     superClass: tm.display.CanvasElement,
 
@@ -710,7 +806,11 @@ tm.define("bfs.Lader", {
         canvas.fillStyle = "rgba(0, 0, 0, 0.5)";
         canvas.fillRect(-75, -75, 150, 150);
         canvas.fillStyle = "blue";
-        canvas.fillRect(-1, -1, 2, 2);
+        canvas.fillRect(-2, -2, 4, 4);
+        canvas.strokeStyle = "rgba(255, 255, 255, 0.8)";
+        canvas.lineWidth = 0.1;
+        canvas.drawLine(-75, 0, 75, 0);
+        canvas.drawLine(0, -75, 0, 75);
         canvas.fillStyle = "red";
         bfs.enemies.forEach(function(enemy) {
             var x = (enemy.x - bfs.myShip.x) / 100;
@@ -720,3 +820,46 @@ tm.define("bfs.Lader", {
     },
 
 });
+
+bfs.isHitElement = function(me, another) {
+    var getBoundingRect = function(sprite) {
+        return tm.geom.Rect(
+            sprite.x - sprite.width*sprite.originX * sprite.scaleX * 0.8,
+            sprite.y - sprite.height*sprite.originY * sprite.scaleY * 0.8,
+            sprite.width * sprite.scaleX * 0.8,
+            sprite.height * sprite.scaleY * 0.8
+        );
+    };
+
+    var bx = function(a, b) {
+        var abr = getBoundingRect(a);
+        var bbr = getBoundingRect(b);
+        var L = tm.geom.Vector2().setDegree(b.rotation, 1);
+        var ea1 = tm.geom.Vector2().setDegree(a.rotation, 1).mul(abr.width/2);
+        var ea2 = tm.geom.Vector2().setDegree(a.rotation + 90, 1).mul(abr.height/2);
+
+        var ra = Math.abs(tm.geom.Vector2.dot(L, ea1)) + Math.abs(tm.geom.Vector2.dot(L, ea2));
+        var rb = bbr.width / 2;
+
+        var interval = Math.abs(tm.geom.Vector2.dot(tm.geom.Vector2(a.x-b.x, a.y-b.y), L));
+
+        return interval < ra+rb;
+    };
+
+    var by = function(a, b) {
+        var abr = getBoundingRect(a);
+        var bbr = getBoundingRect(b);
+        var L = tm.geom.Vector2().setDegree(b.rotation + 90, 1);
+        var ea1 = tm.geom.Vector2().setDegree(a.rotation, 1).mul(abr.width/2);
+        var ea2 = tm.geom.Vector2().setDegree(a.rotation + 90, 1).mul(abr.height/2);
+
+        var ra = Math.abs(tm.geom.Vector2.dot(L, ea1)) + Math.abs(tm.geom.Vector2.dot(L, ea2));
+        var rb = bbr.height / 2;
+
+        var interval = Math.abs(tm.geom.Vector2.dot(tm.geom.Vector2(a.x-b.x, a.y-b.y), L));
+
+        return interval < ra+rb;
+    };
+
+    return bx(me, another) && by(me, another) && bx(another, me) && by(another, me);
+};
