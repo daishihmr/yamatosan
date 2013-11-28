@@ -185,9 +185,20 @@ tm.define("bfs.MainScene", {
     },
 
     update: function() {
-        this.sea.setPosition(-this.myShip.x + 500/2, -this.myShip.y + 500/2);
+        this.setCenter(this.sea, this.myShip);
+        
         this.label.text = "敵艦 残り " + bfs.enemies.length + "隻";
         this.label2.text = "耐久力 残り " + bfs.myShip.hp;
+    },
+
+    setCenter: function(s, m) {
+        var cannon = m.cannons[m.selectedCannon];
+        var v = tm.geom.Vector2();
+        v.setDegree(m.rotation + cannon.rotation, 100);
+        var x = -(m.x + v.x + cannon.x) + 500/2;
+        var y = -(m.y + v.y + cannon.y) + 500/2;
+        s.x = (x - s.x) / 10 + s.x;
+        s.y = (y - s.y) / 10 + s.y;
     },
 
     draw: function(canvas) {
@@ -420,7 +431,7 @@ tm.define("bfs.AIShip", {
             }
         } else {
             this.turnFlag = false;
-            if (-150 < dir && dir < 150) {
+            // if (-150 < dir && dir < 150) {
                 this.ahead = 1;
                 if (dir < 10) {
                     this.turn = -1;
@@ -429,16 +440,16 @@ tm.define("bfs.AIShip", {
                 } else {
                     this.turn = 0;
                 }
-            } else {
-                this.ahead = -1;
-                if (dir < 10) {
-                    this.turn = -1;
-                } else if (-10 < dir) {
-                    this.turn = 1
-                } else {
-                    this.turn = 0;
-                }
-            }
+            // } else {
+            //     this.ahead = -1;
+            //     if (dir < 10) {
+            //         this.turn = -1;
+            //     } else if (-10 < dir) {
+            //         this.turn = 1
+            //     } else {
+            //         this.turn = 0;
+            //     }
+            // }
         }
 
         if (dist < 1000) {
@@ -482,7 +493,7 @@ tm.define("bfs.AIShip", {
 tm.define("bfs.MyShip", {
     superClass: bfs.Ship,
 
-    maxHp: 20000,
+    maxHp: 20,
     maxVelocity: 1.5,
     accel: 0.03,
     turnSpeed: 0.24,
@@ -621,7 +632,7 @@ tm.define("bfs.Bullet", {
 
     age: 0,
     limit: 0,
-    velocity: 5,
+    velocity: 0,
     isMine: false,
     parentVec: null,
 
@@ -630,6 +641,8 @@ tm.define("bfs.Bullet", {
         this.limit = limit;
         this.isMine = isMine;
         this.parentVec = parentVec;
+
+        this.velocity = Math.randf(4.5, 5.5);
     },
 
     update: function(app) {
@@ -780,7 +793,7 @@ tm.define("bfs.SplashL", {
             }
         }), 300, 300);
         this.gotoAndPlay("splash");
-        this.setPosition(x, y-30);
+        this.setPosition(x, y-80);
         this.blendMode = "lighter";
     },
 
