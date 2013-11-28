@@ -194,9 +194,9 @@ tm.define("bfs.MainScene", {
     setCenter: function(s, m) {
         var cannon = m.cannons[m.selectedCannon];
         var v = tm.geom.Vector2();
-        v.setDegree(m.rotation + cannon.rotation, 100);
-        var x = -(m.x + v.x + cannon.x) + 500/2;
-        var y = -(m.y + v.y + cannon.y) + 500/2;
+        v.setDegree(m.rotation + cannon.rotation, 120);
+        var x = -(m.x + v.x) + 500/2;
+        var y = -(m.y + v.y) + 500/2;
         s.x = (x - s.x) / 10 + s.x;
         s.y = (y - s.y) / 10 + s.y;
     },
